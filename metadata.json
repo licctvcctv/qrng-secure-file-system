@@ -1,0 +1,5 @@
+{
+  "name": "QRNG Secure File System",
+  "description": "A simulation of a QRNG-enhanced AES-GCM file encryption system featuring ECC key negotiation and HKDF key derivation.",
+  "requestFramePermissions": []
+}
