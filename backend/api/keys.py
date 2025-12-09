@@ -9,6 +9,13 @@ import os
 import hashlib
 import tempfile
 
+# 尝试导入加密工具（允许失败以保持向后兼容）
+try:
+    from utils.crypto import encrypt_key_hex, decrypt_key_hex
+except ImportError:
+    encrypt_key_hex = lambda x: x
+    decrypt_key_hex = lambda x: x
+
 keys_bp = Blueprint('keys', __name__, url_prefix='/api')
 
 def validate_filename(filename):
@@ -204,7 +211,7 @@ def real_encryption():
         decrypt_count=0,
         storage_path=storage_path,
         iv=iv.hex(),
-        key_hex=key.hex()  # 警告：生产环境应使用主密钥加密存储！
+        key_hex=encrypt_key_hex(key.hex())  # 使用 MASTER_KEY 加密存储
     )
     
     db.session.add(new_key)
@@ -323,7 +330,7 @@ def decrypt_file():
     
     # 解密
     try:
-        key = bytes.fromhex(key_record.key_hex)
+        key = bytes.fromhex(decrypt_key_hex(key_record.key_hex))
         iv = bytes.fromhex(key_record.iv)
         aesgcm = AESGCM(key)
         plaintext = aesgcm.decrypt(iv, ciphertext, None)

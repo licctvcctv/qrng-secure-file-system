@@ -101,9 +101,19 @@ def create_log():
 @login_required
 def reset_db():
     """
-    清空数据（仅管理员）
+    清空数据（仅管理员 + DEBUG 模式）
     警告：这是破坏性操作！
     """
+    from flask import current_app
+    
+    # 仅在 DEBUG 模式下允许
+    if not current_app.config.get('DEBUG', False):
+        return jsonify({
+            'success': False, 
+            'code': 'DISABLED', 
+            'message': 'reset 端点仅在 DEBUG 模式下可用'
+        }), 403
+    
     if current_user.role != 'admin':
         log = AuditLog(
             user=current_user.username,
