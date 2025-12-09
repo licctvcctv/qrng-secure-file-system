@@ -82,12 +82,14 @@ def create_app(config_class=Config):
     from api.users import users_bp
     from api.devices import devices_bp
     from api.logs import logs_bp
+    from api.dashboard import dashboard_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(keys_bp)
     app.register_blueprint(users_bp)
     app.register_blueprint(devices_bp)
     app.register_blueprint(logs_bp)
+    app.register_blueprint(dashboard_bp)
     
     # Create tables on first request (dev convenience)
     with app.app_context():

@@ -9,7 +9,7 @@
     <!-- 统计卡片 -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
       <div 
-        v-for="stat in stats" 
+        v-for="stat in statsCards" 
         :key="stat.label"
         class="glass-card p-6"
       >
@@ -17,9 +17,9 @@
           <div>
             <p class="text-gray-500 text-sm">{{ stat.label }}</p>
             <p class="text-2xl font-bold text-white mt-1">{{ stat.value }}</p>
-            <p v-if="stat.change" :class="[
+            <p v-if="stat.change !== null" :class="[
               'text-xs mt-1',
-              stat.change > 0 ? 'text-green-400' : 'text-red-400'
+              stat.change > 0 ? 'text-green-400' : stat.change < 0 ? 'text-red-400' : 'text-gray-500'
             ]">
               {{ stat.change > 0 ? '+' : '' }}{{ stat.change }}% 较上周
             </p>
@@ -81,10 +81,10 @@
             class="flex items-center justify-between"
           >
             <div class="flex items-center space-x-3">
-              <div :class="['status-dot', item.statusClass]"></div>
+              <div :class="['status-dot', item.status === 'online' ? 'status-online' : item.status === 'warning' ? 'status-pending' : 'status-offline']"></div>
               <span class="text-gray-300">{{ item.label }}</span>
             </div>
-            <span :class="['text-sm', item.valueClass]">{{ item.value }}</span>
+            <span :class="['text-sm', item.status === 'online' ? 'text-green-400' : item.status === 'warning' ? 'text-yellow-400' : 'text-red-400']">{{ item.value }}</span>
           </div>
         </div>
         
@@ -96,7 +96,10 @@
             </div>
             <div>
               <p class="text-white font-medium">QRNG 量子随机源</p>
-              <p class="text-green-400 text-sm">在线 · 熵值优秀</p>
+              <p :class="qrngStatus.online ? 'text-green-400' : 'text-red-400'" class="text-sm">
+                {{ qrngStatus.online ? '在线' : '离线' }} · 
+                熵值{{ qrngStatus.entropy_quality === 'excellent' ? '优秀' : qrngStatus.entropy_quality === 'good' ? '良好' : '一般' }}
+              </p>
             </div>
           </div>
         </div>
@@ -106,8 +109,8 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
-import { keysAPI } from '../api'
+import { ref, computed, onMounted } from 'vue'
+import { keysAPI, dashboardAPI } from '../api'
 import { 
   Key, 
   Shield, 
@@ -120,53 +123,51 @@ import {
 
 const loading = ref(true)
 const keys = ref([])
+const dashboardStats = ref(null)
+const securityStatus = ref([])
+const qrngStatus = ref({ online: true, entropy_quality: 'excellent' })
 
-// 统计数据
-const stats = computed(() => [
-  { 
-    label: '加密文件', 
-    value: keys.value.length, 
-    change: 12, 
-    icon: Lock, 
-    bgColor: 'bg-indigo-500/20', 
-    iconColor: 'text-indigo-400' 
-  },
-  { 
-    label: '存储使用', 
-    value: '2.4 GB', 
-    change: 8, 
-    icon: FileText, 
-    bgColor: 'bg-emerald-500/20', 
-    iconColor: 'text-emerald-400' 
-  },
-  { 
-    label: '安全评分', 
-    value: 'A+', 
-    change: null, 
-    icon: Shield, 
-    bgColor: 'bg-purple-500/20', 
-    iconColor: 'text-purple-400' 
-  },
-  { 
-    label: '待处理告警', 
-    value: '0', 
-    change: null, 
-    icon: AlertTriangle, 
-    bgColor: 'bg-amber-500/20', 
-    iconColor: 'text-amber-400' 
-  }
-])
+// 统计卡片（从后端数据构建）
+const statsCards = computed(() => {
+  const stats = dashboardStats.value?.stats || {}
+  return [
+    { 
+      label: '加密文件', 
+      value: stats.encrypted_files ?? '-', 
+      change: stats.encrypted_files_change ?? null, 
+      icon: Lock, 
+      bgColor: 'bg-indigo-500/20', 
+      iconColor: 'text-indigo-400' 
+    },
+    { 
+      label: '存储使用', 
+      value: stats.storage_used ?? '-', 
+      change: null, 
+      icon: FileText, 
+      bgColor: 'bg-emerald-500/20', 
+      iconColor: 'text-emerald-400' 
+    },
+    { 
+      label: '安全评分', 
+      value: stats.security_score ?? '-', 
+      change: null, 
+      icon: Shield, 
+      bgColor: 'bg-purple-500/20', 
+      iconColor: 'text-purple-400' 
+    },
+    { 
+      label: '待处理告警', 
+      value: String(stats.alerts ?? 0), 
+      change: null, 
+      icon: AlertTriangle, 
+      bgColor: 'bg-amber-500/20', 
+      iconColor: 'text-amber-400' 
+    }
+  ]
+})
 
 // 最近密钥
 const recentKeys = computed(() => keys.value.slice(0, 5))
-
-// 安全状态
-const securityStatus = [
-  { label: '加密通道', value: 'TLS 1.3', statusClass: 'status-online', valueClass: 'text-green-400' },
-  { label: '会话状态', value: '已认证', statusClass: 'status-online', valueClass: 'text-green-400' },
-  { label: '密钥轮换', value: '正常', statusClass: 'status-online', valueClass: 'text-green-400' },
-  { label: '威胁检测', value: '无异常', statusClass: 'status-online', valueClass: 'text-green-400' }
-]
 
 // 格式化时间
 const formatTime = (isoString) => {
@@ -183,12 +184,23 @@ const formatTime = (isoString) => {
 // 加载数据
 onMounted(async () => {
   try {
-    const res = await keysAPI.list()
-    if (res.success) {
-      keys.value = res.keys
+    // 并行加载
+    const [keysRes, statsRes] = await Promise.all([
+      keysAPI.list(),
+      dashboardAPI.stats()
+    ])
+    
+    if (keysRes.success) {
+      keys.value = keysRes.keys
+    }
+    
+    if (statsRes.success) {
+      dashboardStats.value = statsRes
+      securityStatus.value = statsRes.security_status || []
+      qrngStatus.value = statsRes.qrng || { online: true, entropy_quality: 'excellent' }
     }
   } catch (e) {
-    console.error('Failed to load keys:', e)
+    console.error('Failed to load dashboard data:', e)
   } finally {
     loading.value = false
   }

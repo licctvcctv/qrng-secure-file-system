@@ -73,4 +73,9 @@ export const logsAPI = {
     reset: () => api.post('/reset')
 }
 
+// 仪表盘 API
+export const dashboardAPI = {
+    stats: () => api.get('/dashboard/stats')
+}
+
 export default api
