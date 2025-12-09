@@ -1,5 +1,12 @@
 <template>
   <div class="min-h-screen bg-dark-900">
+    <!-- 全局 Toast -->
+    <Toast 
+      :message="toastState.message" 
+      :type="toastState.type"
+      @close="toastState.clear()"
+    />
+    
     <!-- 未登录显示登录页 -->
     <template v-if="!store.isAuthenticated && $route.path !== '/login'">
       <router-view />
@@ -33,7 +40,9 @@
 import { onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import store from './store'
+import toastState from './composables/useToast'
 import Sidebar from './components/Sidebar.vue'
+import Toast from './components/Toast.vue'
 
 const router = useRouter()
 const route = useRoute()

@@ -68,28 +68,22 @@
         </tbody>
       </table>
     </div>
-    
-    <!-- 解密结果提示 -->
-    <div v-if="decryptMessage" :class="[
-      'fixed bottom-4 right-4 px-4 py-3 rounded-lg shadow-lg transition-all duration-300',
-      decryptSuccess ? 'bg-green-500/90' : 'bg-red-500/90'
-    ]">
-      <p class="text-white text-sm">{{ decryptMessage }}</p>
-    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { keysAPI } from '../api'
+import toast from '../composables/useToast'
 import { Key, Search, Loader2, Download } from 'lucide-vue-next'
 
 const loading = ref(true)
 const keys = ref([])
 const search = ref('')
 const decrypting = ref(null)
-const decryptMessage = ref('')
-const decryptSuccess = ref(false)
+
+// API 基础地址
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://127.0.0.1:5000/api'
 
 // 过滤后的密钥
 const filteredKeys = computed(() => {
@@ -106,13 +100,17 @@ const formatTime = (isoString) => {
   return new Date(isoString).toLocaleString('zh-CN')
 }
 
-// 显示消息
-const showMessage = (message, success = true) => {
-  decryptMessage.value = message
-  decryptSuccess.value = success
-  setTimeout(() => {
-    decryptMessage.value = ''
-  }, 3000)
+// 构造下载 URL（安全方式，不用字符串替换）
+const buildDownloadUrl = (downloadPath) => {
+  // 后端返回 /api/download/xxx?token=yyy
+  // 我们需要拼接为完整 URL
+  try {
+    const baseUrl = API_BASE.replace(/\/api\/?$/, '') // 移除 /api 后缀
+    return new URL(downloadPath, baseUrl).href
+  } catch {
+    // fallback
+    return API_BASE.replace(/\/api\/?$/, '') + downloadPath
+  }
 }
 
 // 解密并自动下载
@@ -125,49 +123,44 @@ const handleDecrypt = async (key) => {
     if (res.success) {
       if (res.simulated) {
         // 模拟加密的文件，无法实际下载
-        showMessage(`模拟解密成功 - ${key.file_name}`)
+        toast.warning(`${key.file_name} 为模拟加密，无实际文件`)
       } else {
         // 真实加密的文件，自动触发下载
-        showMessage(`解密成功，正在下载...`)
+        toast.info('正在下载...')
         
-        // 使用 download_url 下载文件
-        const downloadUrl = `${import.meta.env.VITE_API_BASE || 'http://127.0.0.1:5000/api'}${res.download_url.replace('/api', '')}`
+        const downloadUrl = buildDownloadUrl(res.download_url)
         
-        // 创建隐藏的 iframe 或 link 进行下载
-        const link = document.createElement('a')
-        link.href = downloadUrl
-        link.download = key.file_name
-        link.style.display = 'none'
-        document.body.appendChild(link)
-        
-        // 需要携带 cookie，使用 fetch 下载
+        // 使用 fetch 下载（需要携带 cookie）
         try {
           const response = await fetch(downloadUrl, { credentials: 'include' })
           if (response.ok) {
             const blob = await response.blob()
             const url = window.URL.createObjectURL(blob)
+            const link = document.createElement('a')
             link.href = url
+            link.download = key.file_name
+            document.body.appendChild(link)
             link.click()
+            document.body.removeChild(link)
             window.URL.revokeObjectURL(url)
-            showMessage(`下载完成 - ${key.file_name}`)
+            toast.success(`下载完成 - ${key.file_name}`)
           } else {
-            throw new Error('下载失败')
+            const errorData = await response.json().catch(() => ({}))
+            throw new Error(errorData.message || '下载失败')
           }
         } catch (e) {
-          showMessage(`下载失败: ${e.message}`, false)
+          toast.error(`下载失败: ${e.message}`)
         }
-        
-        document.body.removeChild(link)
       }
       
       // 刷新列表更新解密次数
       await loadKeys()
     } else {
-      showMessage(res.message || '解密失败', false)
+      toast.error(res.message || '解密失败')
     }
   } catch (e) {
     console.error('Decrypt failed:', e)
-    showMessage(e.response?.data?.message || '解密过程中发生错误', false)
+    toast.error(e.response?.data?.message || '解密过程中发生错误')
   } finally {
     decrypting.value = null
   }

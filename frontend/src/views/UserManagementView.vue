@@ -129,6 +129,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { usersAPI } from '../api'
+import toast from '../composables/useToast'
 import { Plus, Loader2 } from 'lucide-vue-next'
 
 const loading = ref(true)
@@ -174,6 +175,7 @@ const submitUser = async () => {
         department: form.department,
         role: form.role
       })
+      toast.success('用户已更新')
     } else {
       await usersAPI.create({
         username: form.username,
@@ -182,11 +184,12 @@ const submitUser = async () => {
         department: form.department,
         role: form.role
       })
+      toast.success('用户已创建')
     }
     await loadUsers()
     closeModal()
   } catch (e) {
-    alert(e.response?.data?.message || '操作失败')
+    toast.error(e.response?.data?.message || '操作失败')
   }
 }
 
@@ -195,8 +198,9 @@ const toggleStatus = async (user) => {
   try {
     await usersAPI.update(user.id, { status: newStatus })
     user.status = newStatus
+    toast.success(newStatus === 'active' ? '已解锁' : '已锁定')
   } catch (e) {
-    alert('更新失败')
+    toast.error('更新失败')
   }
 }
 
@@ -204,9 +208,10 @@ const deleteUser = async (user) => {
   if (!confirm(`确定删除用户 ${user.name}？`)) return
   try {
     await usersAPI.delete(user.id)
+    toast.success('用户已删除')
     await loadUsers()
   } catch (e) {
-    alert(e.response?.data?.message || '删除失败')
+    toast.error(e.response?.data?.message || '删除失败')
   }
 }
 

@@ -125,6 +125,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { devicesAPI } from '../api'
 import store from '../store'
+import toast from '../composables/useToast'
 import { Monitor, Plus, Loader2, Trash2 } from 'lucide-vue-next'
 
 const loading = ref(true)
@@ -150,11 +151,12 @@ const addDevice = async () => {
       ip: form.ip,
       status: form.status
     })
+    toast.success('设备已添加')
     await loadDevices()
     showAddModal.value = false
     resetForm()
   } catch (e) {
-    alert(e.response?.data?.message || '添加失败')
+    toast.error(e.response?.data?.message || '添加失败')
   }
 }
 
@@ -163,8 +165,9 @@ const updateStatus = async (device, status) => {
   try {
     await devicesAPI.updateStatus(device.id, status)
     device.status = status
+    toast.success(`设备状态已更新为 ${status}`)
   } catch (e) {
-    alert(e.response?.data?.message || '更新失败')
+    toast.error(e.response?.data?.message || '更新失败')
   }
 }
 
@@ -172,9 +175,10 @@ const deleteDevice = async (device) => {
   if (!confirm(`确定删除设备 ${device.name}？`)) return
   try {
     await devicesAPI.delete(device.id)
+    toast.success('设备已删除')
     await loadDevices()
   } catch (e) {
-    alert(e.response?.data?.message || '删除失败')
+    toast.error(e.response?.data?.message || '删除失败')
   }
 }
 
