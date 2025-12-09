@@ -55,15 +55,26 @@
             <td class="px-4 py-3 text-gray-500 text-sm">{{ formatTime(key.created_at) }}</td>
             <td class="px-4 py-3">
               <button 
-                @click="handleDecrypt(key.id)"
-                class="text-indigo-400 hover:text-indigo-300 text-sm"
+                @click="handleDecrypt(key)"
+                :disabled="decrypting === key.id"
+                class="text-indigo-400 hover:text-indigo-300 text-sm disabled:opacity-50 flex items-center space-x-1"
               >
-                解密
+                <Loader2 v-if="decrypting === key.id" class="w-4 h-4 animate-spin" />
+                <Download v-else class="w-4 h-4" />
+                <span>{{ decrypting === key.id ? '解密中...' : '解密下载' }}</span>
               </button>
             </td>
           </tr>
         </tbody>
       </table>
+    </div>
+    
+    <!-- 解密结果提示 -->
+    <div v-if="decryptMessage" :class="[
+      'fixed bottom-4 right-4 px-4 py-3 rounded-lg shadow-lg transition-all duration-300',
+      decryptSuccess ? 'bg-green-500/90' : 'bg-red-500/90'
+    ]">
+      <p class="text-white text-sm">{{ decryptMessage }}</p>
     </div>
   </div>
 </template>
@@ -71,11 +82,14 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { keysAPI } from '../api'
-import { Key, Search, Loader2 } from 'lucide-vue-next'
+import { Key, Search, Loader2, Download } from 'lucide-vue-next'
 
 const loading = ref(true)
 const keys = ref([])
 const search = ref('')
+const decrypting = ref(null)
+const decryptMessage = ref('')
+const decryptSuccess = ref(false)
 
 // 过滤后的密钥
 const filteredKeys = computed(() => {
@@ -92,20 +106,75 @@ const formatTime = (isoString) => {
   return new Date(isoString).toLocaleString('zh-CN')
 }
 
-// 解密
-const handleDecrypt = async (keyId) => {
+// 显示消息
+const showMessage = (message, success = true) => {
+  decryptMessage.value = message
+  decryptSuccess.value = success
+  setTimeout(() => {
+    decryptMessage.value = ''
+  }, 3000)
+}
+
+// 解密并自动下载
+const handleDecrypt = async (key) => {
+  decrypting.value = key.id
+  
   try {
-    const res = await keysAPI.decrypt(keyId)
+    const res = await keysAPI.decrypt(key.id)
+    
     if (res.success) {
-      alert(res.simulated ? '模拟解密成功' : `解密成功！下载链接：${res.download_url}`)
+      if (res.simulated) {
+        // 模拟加密的文件，无法实际下载
+        showMessage(`模拟解密成功 - ${key.file_name}`)
+      } else {
+        // 真实加密的文件，自动触发下载
+        showMessage(`解密成功，正在下载...`)
+        
+        // 使用 download_url 下载文件
+        const downloadUrl = `${import.meta.env.VITE_API_BASE || 'http://127.0.0.1:5000/api'}${res.download_url.replace('/api', '')}`
+        
+        // 创建隐藏的 iframe 或 link 进行下载
+        const link = document.createElement('a')
+        link.href = downloadUrl
+        link.download = key.file_name
+        link.style.display = 'none'
+        document.body.appendChild(link)
+        
+        // 需要携带 cookie，使用 fetch 下载
+        try {
+          const response = await fetch(downloadUrl, { credentials: 'include' })
+          if (response.ok) {
+            const blob = await response.blob()
+            const url = window.URL.createObjectURL(blob)
+            link.href = url
+            link.click()
+            window.URL.revokeObjectURL(url)
+            showMessage(`下载完成 - ${key.file_name}`)
+          } else {
+            throw new Error('下载失败')
+          }
+        } catch (e) {
+          showMessage(`下载失败: ${e.message}`, false)
+        }
+        
+        document.body.removeChild(link)
+      }
+      
+      // 刷新列表更新解密次数
+      await loadKeys()
+    } else {
+      showMessage(res.message || '解密失败', false)
     }
   } catch (e) {
-    alert('解密失败')
+    console.error('Decrypt failed:', e)
+    showMessage(e.response?.data?.message || '解密过程中发生错误', false)
+  } finally {
+    decrypting.value = null
   }
 }
 
-// 加载数据
-onMounted(async () => {
+// 加载密钥列表
+const loadKeys = async () => {
   try {
     const res = await keysAPI.list()
     if (res.success) {
@@ -113,8 +182,12 @@ onMounted(async () => {
     }
   } catch (e) {
     console.error('Failed to load keys:', e)
-  } finally {
-    loading.value = false
   }
+}
+
+// 加载数据
+onMounted(async () => {
+  await loadKeys()
+  loading.value = false
 })
 </script>

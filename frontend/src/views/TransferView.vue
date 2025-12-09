@@ -46,7 +46,7 @@
       </div>
       
       <!-- 加密选项 -->
-      <div v-if="selectedFile" class="mt-6 grid grid-cols-2 gap-4">
+      <div v-if="selectedFile" class="mt-6 grid grid-cols-3 gap-4">
         <div>
           <label class="block text-sm text-gray-400 mb-2">加密算法</label>
           <select v-model="algorithm" class="input-field">
@@ -59,6 +59,13 @@
           <select v-model="keyMode" class="input-field">
             <option value="QRNG-Auto">QRNG 自动生成</option>
             <option value="Custom-Seed">自定义种子</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm text-gray-400 mb-2">加密模式</label>
+          <select v-model="encryptMode" class="input-field">
+            <option value="real">真实加密（落盘）</option>
+            <option value="simulate">模拟演示</option>
           </select>
         </div>
       </div>
@@ -84,15 +91,18 @@
             'w-6 h-6 rounded-full flex items-center justify-center',
             step.status === 'complete' ? 'bg-green-500' :
             step.status === 'active' ? 'bg-indigo-500 animate-pulse' :
+            step.status === 'error' ? 'bg-red-500' :
             'bg-gray-700'
           ]">
             <Check v-if="step.status === 'complete'" class="w-4 h-4 text-white" />
+            <X v-else-if="step.status === 'error'" class="w-4 h-4 text-white" />
             <Loader2 v-else-if="step.status === 'active'" class="w-4 h-4 text-white animate-spin" />
             <span v-else class="text-xs text-gray-400">{{ index + 1 }}</span>
           </div>
           <span :class="[
             step.status === 'complete' ? 'text-green-400' :
             step.status === 'active' ? 'text-white' :
+            step.status === 'error' ? 'text-red-400' :
             'text-gray-500'
           ]">{{ step.label }}</span>
         </div>
@@ -104,6 +114,18 @@
       <p class="text-center text-gray-500 text-sm mt-2">{{ progress }}%</p>
     </div>
     
+    <!-- 错误提示 -->
+    <div v-if="error" class="glass-card p-6 mt-6 border border-red-500/50">
+      <div class="flex items-center space-x-3">
+        <AlertCircle class="w-6 h-6 text-red-400" />
+        <div>
+          <h3 class="text-red-400 font-medium">加密失败</h3>
+          <p class="text-gray-500 text-sm">{{ error }}</p>
+        </div>
+      </div>
+      <button @click="reset" class="mt-4 btn-secondary">重试</button>
+    </div>
+    
     <!-- 加密结果 -->
     <div v-if="result" class="glass-card p-6 mt-6">
       <div class="flex items-center space-x-3 mb-4">
@@ -112,7 +134,9 @@
         </div>
         <div>
           <h3 class="text-white font-medium">加密成功</h3>
-          <p class="text-gray-500 text-sm">文件已安全加密</p>
+          <p class="text-gray-500 text-sm">
+            {{ encryptMode === 'real' ? '文件已安全加密并存储' : '模拟加密完成' }}
+          </p>
         </div>
       </div>
       
@@ -124,6 +148,12 @@
         <div class="flex justify-between text-sm">
           <span class="text-gray-500">指纹</span>
           <span class="text-white font-mono">{{ result.fingerprint }}</span>
+        </div>
+        <div class="flex justify-between text-sm">
+          <span class="text-gray-500">模式</span>
+          <span :class="encryptMode === 'real' ? 'text-green-400' : 'text-yellow-400'">
+            {{ encryptMode === 'real' ? '真实加密' : '模拟演示' }}
+          </span>
         </div>
       </div>
       
@@ -140,15 +170,17 @@
 <script setup>
 import { ref } from 'vue'
 import { keysAPI } from '../api'
-import { Upload, FileText, X, Lock, Check, Loader2 } from 'lucide-vue-next'
+import { Upload, FileText, X, Lock, Check, Loader2, AlertCircle } from 'lucide-vue-next'
 
 const selectedFile = ref(null)
 const isDragging = ref(false)
 const algorithm = ref('AES-256-GCM')
 const keyMode = ref('QRNG-Auto')
+const encryptMode = ref('real') // 默认真实加密
 const encrypting = ref(false)
 const progress = ref(0)
 const result = ref(null)
+const error = ref('')
 
 const steps = ref([
   { label: '计算文件哈希', status: 'pending' },
@@ -186,38 +218,54 @@ const startEncryption = async () => {
   encrypting.value = true
   progress.value = 0
   result.value = null
+  error.value = ''
   
-  // 模拟加密步骤
-  for (let i = 0; i < steps.value.length; i++) {
-    steps.value[i].status = 'active'
-    await wait(500 + Math.random() * 500)
-    steps.value[i].status = 'complete'
-    progress.value = Math.round(((i + 1) / steps.value.length) * 100)
-  }
+  // 重置步骤状态
+  steps.value.forEach(s => s.status = 'pending')
   
-  // 调用后端 API
   try {
+    // 模拟前端进度（与后端处理并行）
+    for (let i = 0; i < steps.value.length - 1; i++) {
+      steps.value[i].status = 'active'
+      await wait(300 + Math.random() * 300)
+      steps.value[i].status = 'complete'
+      progress.value = Math.round(((i + 1) / steps.value.length) * 80)
+    }
+    
+    // 最后一步：调用后端 API
+    steps.value[steps.value.length - 1].status = 'active'
+    
     const formData = new FormData()
     formData.append('file', selectedFile.value)
     formData.append('algorithm', algorithm.value)
     formData.append('keyMode', keyMode.value)
-    formData.append('mode', 'simulate') // 使用模拟模式
+    formData.append('mode', encryptMode.value) // 真实或模拟
     
     const res = await keysAPI.encrypt(formData)
+    
     if (res.success) {
+      steps.value[steps.value.length - 1].status = 'complete'
+      progress.value = 100
       result.value = res
+    } else {
+      throw new Error(res.message || '加密失败')
     }
   } catch (e) {
     console.error('Encryption failed:', e)
+    // 标记当前步骤为错误
+    const activeStep = steps.value.find(s => s.status === 'active')
+    if (activeStep) activeStep.status = 'error'
+    error.value = e.response?.data?.message || e.message || '加密过程中发生错误'
+  } finally {
+    encrypting.value = false
   }
-  
-  encrypting.value = false
 }
 
 // 重置
 const reset = () => {
   selectedFile.value = null
   result.value = null
+  error.value = ''
   progress.value = 0
   steps.value.forEach(s => s.status = 'pending')
 }

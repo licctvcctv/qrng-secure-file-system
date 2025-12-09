@@ -1,137 +1,65 @@
-# Phase 2 Transformation Report: Vue 3 Frontend Initialization
+# Phase 2 Transformation Report: Vue 3 Frontend
 
 **日期**: 2025-12-09  
-**状态**: ✅ 已完成
+**状态**: ✅ 已完成（含修复）
 
 ---
 
 ## 1. 概述
 
-完成了 Vue 3 + Vite 前端项目的初始化，包括 Tailwind CSS 配置、API 封装、路由系统和所有核心视图组件。
+Vue 3 + Vite 前端项目完整实现，包含真实加密支持、自动下载、完整 CRUD 操作。
 
 ---
 
-## 2. 创建的文件
+## 2. 核心功能
 
-### 2.1 项目配置
-| 文件 | 说明 |
-|:-----|:-----|
-| `frontend/tailwind.config.js` | Tailwind 配置（深色主题、自定义动画） |
-| `frontend/postcss.config.js` | PostCSS 配置（使用 @tailwindcss/postcss） |
-| `frontend/src/style.css` | 全局样式（玻璃态、霓虹效果） |
+### 2.1 安全传输 (TransferView)
+- **默认真实加密**（AES-256-GCM 落盘）
+- 支持"模拟演示"模式切换
+- 加密进度动画（5 步骤）
+- **错误处理**：显示失败原因和重试按钮
+- 结果展示：密钥 ID、指纹、加密模式
 
-### 2.2 核心模块
-| 文件 | 说明 |
-|:-----|:-----|
-| `frontend/src/main.js` | 应用入口 |
-| `frontend/src/App.vue` | 主布局组件 |
-| `frontend/src/router.js` | Vue Router 配置（含路由守卫） |
-| `frontend/src/store.js` | 全局状态管理 |
-| `frontend/src/api/index.js` | Axios API 封装 |
+### 2.2 密钥管理 (KeyManagementView)
+- 密钥列表（搜索过滤）
+- **解密后自动下载**（两步流程自动完成）
+- 模拟加密文件提示"无法下载"
+- 状态提示（成功/失败 Toast）
 
-### 2.3 组件
-| 文件 | 说明 |
-|:-----|:-----|
-| `frontend/src/components/Sidebar.vue` | 侧边栏导航 |
+### 2.3 用户管理 (UserManagementView) - 仅管理员
+- ✅ **创建用户**（用户名/密码/角色）
+- ✅ **编辑用户**（名称/部门/角色）
+- ✅ **锁定/解锁**（状态切换）
+- ✅ **删除用户**（带确认）
 
-### 2.4 视图页面
-| 文件 | 说明 |
-|:-----|:-----|
-| `LoginView.vue` | 登录页（含演示账号快捷填充） |
-| `DashboardView.vue` | 控制台（统计卡片、最近密钥） |
-| `TransferView.vue` | 安全传输（文件上传、加密进度动画） |
-| `KeyManagementView.vue` | 密钥管理（列表、搜索、解密） |
-| `AuditView.vue` | 审计日志 |
-| `UserManagementView.vue` | 用户管理（仅管理员） |
-| `DeviceManagerView.vue` | 设备管理 |
-| `SettingsView.vue` | 设置页面 |
+### 2.4 设备管理 (DeviceManagerView)
+- ✅ **添加设备**（名称/IP/初始状态）
+- ✅ **状态切换**（信任/待审/撤销）
+- ✅ **删除设备**
+- 普通用户只读，管理员可操作
+
+### 2.5 其他视图
+- **Dashboard**: 统计卡片、最近密钥、安全状态
+- **AuditView**: 日志列表（支持级别筛选）
+- **SettingsView**: 个人资料展示（保存功能待完善）
 
 ---
 
-## 3. 技术栈
+## 3. 运行方式
 
-| 技术 | 版本 | 用途 |
-|:-----|:-----|:-----|
-| Vue | 3.x | 响应式框架 |
-| Vite | 7.x | 构建工具 |
-| Vue Router | 4.x | 路由管理 |
-| Tailwind CSS | 4.x | 样式框架 |
-| Axios | - | HTTP 客户端 |
-| Lucide Vue | - | 图标库 |
-
----
-
-## 4. 功能特性
-
-### 4.1 登录系统
-- 表单验证
-- 演示账号一键填充
-- 密码显示/隐藏切换
-
-### 4.2 控制台
-- 统计卡片（加密文件数、存储量）
-- 最近密钥列表
-- 安全状态仪表盘
-- QRNG 量子随机源状态
-
-### 4.3 安全传输
-- 拖拽上传
-- 算法/密钥模式选择
-- **加密进度动画**（5 步骤）
-- 结果展示（密钥 ID、指纹）
-
-### 4.4 路由守卫
-- 未登录重定向到登录页
-- 管理员页面权限检查
-- 自动恢复登录状态
-
----
-
-## 5. 构建结果
-
-```
-dist/
-├── index.html                 0.45 kB
-├── assets/
-│   ├── index-*.css           24.27 kB (gzip: 5.21 kB)
-│   ├── index-*.js           139.02 kB (gzip: 54.05 kB)
-│   ├── LoginView-*.js         4.20 kB
-│   ├── DashboardView-*.js     4.98 kB
-│   ├── TransferView-*.js      5.99 kB
-│   └── ...
-```
-
----
-
-## 6. 运行方式
-
-### 开发模式
 ```bash
-cd frontend
-npm run dev
-# 访问 http://localhost:5173
-```
-
-### 生产构建
-```bash
-cd frontend
-npm run build
-# 输出到 dist/
-```
-
-### 同时运行前后端
-```bash
-# 终端 1: 后端
+# 后端
 cd backend && ../venv/bin/python app.py
 
-# 终端 2: 前端
+# 前端
 cd frontend && npm run dev
 ```
 
+访问 http://localhost:5173
+
 ---
 
-## 7. 下一步（Phase 3）
+## 4. 待完善
 
-- [ ] 完善组件细节
-- [ ] 添加更多交互功能
-- [ ] 端到端测试
+- SettingsView 保存功能
+- 更多表单校验提示
