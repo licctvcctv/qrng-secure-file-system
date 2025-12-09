@@ -88,7 +88,7 @@
       <div class="space-y-4">
         <div v-for="(step, index) in steps" :key="index" class="flex items-center space-x-3">
           <div :class="[
-            'w-6 h-6 rounded-full flex items-center justify-center',
+            'w-6 h-6 rounded-full flex items-center justify-center transition-all duration-300',
             step.status === 'complete' ? 'bg-green-500' :
             step.status === 'active' ? 'bg-indigo-500 animate-pulse' :
             step.status === 'error' ? 'bg-red-500' :
@@ -99,17 +99,23 @@
             <Loader2 v-else-if="step.status === 'active'" class="w-4 h-4 text-white animate-spin" />
             <span v-else class="text-xs text-gray-400">{{ index + 1 }}</span>
           </div>
-          <span :class="[
-            step.status === 'complete' ? 'text-green-400' :
-            step.status === 'active' ? 'text-white' :
-            step.status === 'error' ? 'text-red-400' :
-            'text-gray-500'
-          ]">{{ step.label }}</span>
+          <div class="flex-1">
+            <span :class="[
+              'transition-colors duration-300',
+              step.status === 'complete' ? 'text-green-400' :
+              step.status === 'active' ? 'text-white' :
+              step.status === 'error' ? 'text-red-400' :
+              'text-gray-500'
+            ]">{{ step.label }}</span>
+            <span v-if="step.status === 'active' && step.detail" class="text-gray-500 text-xs ml-2">
+              {{ step.detail }}
+            </span>
+          </div>
         </div>
       </div>
       
       <div class="mt-6 bg-dark-700 rounded-full h-2 overflow-hidden">
-        <div class="progress-bar" :style="{ width: progress + '%' }"></div>
+        <div class="progress-bar transition-all duration-300" :style="{ width: progress + '%' }"></div>
       </div>
       <p class="text-center text-gray-500 text-sm mt-2">{{ progress }}%</p>
     </div>
@@ -155,6 +161,10 @@
             {{ encryptMode === 'real' ? '真实加密' : '模拟演示' }}
           </span>
         </div>
+        <div class="flex justify-between text-sm">
+          <span class="text-gray-500">耗时</span>
+          <span class="text-white">{{ elapsedTime }}</span>
+        </div>
       </div>
       
       <button 
@@ -176,42 +186,47 @@ const selectedFile = ref(null)
 const isDragging = ref(false)
 const algorithm = ref('AES-256-GCM')
 const keyMode = ref('QRNG-Auto')
-const encryptMode = ref('real') // 默认真实加密
+const encryptMode = ref('real')
 const encrypting = ref(false)
 const progress = ref(0)
 const result = ref(null)
 const error = ref('')
+const startTime = ref(0)
+const elapsedTime = ref('')
 
 const steps = ref([
-  { label: '计算文件哈希', status: 'pending' },
-  { label: '连接量子随机源', status: 'pending' },
-  { label: '生成加密密钥', status: 'pending' },
-  { label: '加密文件数据', status: 'pending' },
-  { label: '保存加密记录', status: 'pending' }
+  { label: '计算文件哈希', status: 'pending', detail: '' },
+  { label: '连接量子随机源', status: 'pending', detail: '' },
+  { label: '生成加密密钥', status: 'pending', detail: '' },
+  { label: '加密文件数据', status: 'pending', detail: '' },
+  { label: '保存加密记录', status: 'pending', detail: '' }
 ])
 
-// 格式化文件大小
 const formatFileSize = (bytes) => {
   if (bytes < 1024) return bytes + ' B'
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
 }
 
-// 文件选择
 const handleFileSelect = (e) => {
   const file = e.target.files[0]
   if (file) selectedFile.value = file
 }
 
-// 拖拽上传
 const handleDrop = (e) => {
   isDragging.value = false
   const file = e.dataTransfer.files[0]
   if (file) selectedFile.value = file
 }
 
-// 延时函数
-const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms))
+// 更新步骤状态
+const updateStep = (index, status, detail = '') => {
+  steps.value[index].status = status
+  steps.value[index].detail = detail
+  // 计算进度
+  const completed = steps.value.filter(s => s.status === 'complete').length
+  progress.value = Math.round((completed / steps.value.length) * 100)
+}
 
 // 开始加密
 const startEncryption = async () => {
@@ -219,54 +234,76 @@ const startEncryption = async () => {
   progress.value = 0
   result.value = null
   error.value = ''
+  startTime.value = Date.now()
   
-  // 重置步骤状态
-  steps.value.forEach(s => s.status = 'pending')
+  // 重置步骤
+  steps.value.forEach(s => { s.status = 'pending'; s.detail = '' })
   
   try {
-    // 模拟前端进度（与后端处理并行）
-    for (let i = 0; i < steps.value.length - 1; i++) {
-      steps.value[i].status = 'active'
-      await wait(300 + Math.random() * 300)
-      steps.value[i].status = 'complete'
-      progress.value = Math.round(((i + 1) / steps.value.length) * 80)
-    }
+    // Step 1: 计算哈希（前端模拟）
+    updateStep(0, 'active', '正在计算...')
+    await new Promise(r => setTimeout(r, 200))
+    updateStep(0, 'complete')
     
-    // 最后一步：调用后端 API
-    steps.value[steps.value.length - 1].status = 'active'
+    // Step 2: 连接 QRNG
+    updateStep(1, 'active', '正在连接...')
+    await new Promise(r => setTimeout(r, 150))
+    updateStep(1, 'complete')
     
+    // Step 3: 生成密钥
+    updateStep(2, 'active', '生成 256-bit 密钥')
+    await new Promise(r => setTimeout(r, 100))
+    updateStep(2, 'complete')
+    
+    // Step 4: 加密文件（准备上传）
+    updateStep(3, 'active', `加密 ${formatFileSize(selectedFile.value.size)}`)
+    
+    // 调用后端 API
     const formData = new FormData()
     formData.append('file', selectedFile.value)
     formData.append('algorithm', algorithm.value)
     formData.append('keyMode', keyMode.value)
-    formData.append('mode', encryptMode.value) // 真实或模拟
+    formData.append('mode', encryptMode.value)
     
     const res = await keysAPI.encrypt(formData)
     
+    updateStep(3, 'complete')
+    
+    // Step 5: 保存记录
+    updateStep(4, 'active', '写入数据库')
+    await new Promise(r => setTimeout(r, 100))
+    
     if (res.success) {
-      steps.value[steps.value.length - 1].status = 'complete'
+      updateStep(4, 'complete')
       progress.value = 100
       result.value = res
+      
+      // 计算耗时
+      const elapsed = Date.now() - startTime.value
+      if (elapsed < 1000) {
+        elapsedTime.value = `${elapsed} ms`
+      } else {
+        elapsedTime.value = `${(elapsed / 1000).toFixed(2)} 秒`
+      }
     } else {
       throw new Error(res.message || '加密失败')
     }
   } catch (e) {
     console.error('Encryption failed:', e)
-    // 标记当前步骤为错误
-    const activeStep = steps.value.find(s => s.status === 'active')
-    if (activeStep) activeStep.status = 'error'
+    const activeStep = steps.value.findIndex(s => s.status === 'active')
+    if (activeStep >= 0) updateStep(activeStep, 'error')
     error.value = e.response?.data?.message || e.message || '加密过程中发生错误'
   } finally {
     encrypting.value = false
   }
 }
 
-// 重置
 const reset = () => {
   selectedFile.value = null
   result.value = null
   error.value = ''
   progress.value = 0
-  steps.value.forEach(s => s.status = 'pending')
+  elapsedTime.value = ''
+  steps.value.forEach(s => { s.status = 'pending'; s.detail = '' })
 }
 </script>

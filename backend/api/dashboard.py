@@ -106,10 +106,30 @@ def get_dashboard_stats():
         'revoked': sum(1 for d in devices if d.status == 'revoked')
     }
     
-    # QRNG 状态（模拟）
+    # QRNG 状态（随机波动模拟真实探针）
+    import random
+    
+    # 模拟熵值波动（0.85-1.0 范围内波动）
+    entropy_value = 0.85 + random.random() * 0.15
+    
+    # 根据熵值判断质量
+    if entropy_value >= 0.95:
+        entropy_quality = 'excellent'
+    elif entropy_value >= 0.90:
+        entropy_quality = 'good'
+    elif entropy_value >= 0.85:
+        entropy_quality = 'fair'
+    else:
+        entropy_quality = 'poor'
+    
+    # 模拟偶尔的状态波动（99%在线）
+    qrng_online = random.random() > 0.01
+    
     qrng_status = {
-        'online': True,
-        'entropy_quality': 'excellent',  # excellent, good, fair, poor
+        'online': qrng_online,
+        'entropy_quality': entropy_quality,
+        'entropy_value': round(entropy_value, 4),
+        'bit_rate': f"{random.randint(800, 1200)} Mbps",
         'last_sync': datetime.utcnow().isoformat()
     }
     

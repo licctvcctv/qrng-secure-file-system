@@ -91,15 +91,25 @@
         <!-- 量子随机源状态 -->
         <div class="mt-6 p-4 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 rounded-lg border border-indigo-500/20">
           <div class="flex items-center space-x-3">
-            <div class="w-12 h-12 rounded-lg bg-indigo-500/30 flex items-center justify-center">
-              <Zap class="w-6 h-6 text-indigo-400" />
+            <div :class="[
+              'w-12 h-12 rounded-lg flex items-center justify-center',
+              qrngStatus.online ? 'bg-indigo-500/30' : 'bg-red-500/30'
+            ]">
+              <Zap :class="['w-6 h-6', qrngStatus.online ? 'text-indigo-400' : 'text-red-400']" />
             </div>
-            <div>
+            <div class="flex-1">
               <p class="text-white font-medium">QRNG 量子随机源</p>
               <p :class="qrngStatus.online ? 'text-green-400' : 'text-red-400'" class="text-sm">
                 {{ qrngStatus.online ? '在线' : '离线' }} · 
-                熵值{{ qrngStatus.entropy_quality === 'excellent' ? '优秀' : qrngStatus.entropy_quality === 'good' ? '良好' : '一般' }}
+                熵值{{ qrngQualityText }}
+                <span v-if="qrngStatus.entropy_value" class="text-gray-500">
+                  ({{ (qrngStatus.entropy_value * 100).toFixed(1) }}%)
+                </span>
               </p>
+            </div>
+            <div v-if="qrngStatus.bit_rate" class="text-right">
+              <p class="text-xs text-gray-500">比特率</p>
+              <p class="text-sm text-indigo-400">{{ qrngStatus.bit_rate }}</p>
             </div>
           </div>
         </div>
@@ -168,6 +178,15 @@ const statsCards = computed(() => {
 
 // 最近密钥
 const recentKeys = computed(() => keys.value.slice(0, 5))
+
+// QRNG 质量文本
+const qrngQualityText = computed(() => {
+  const q = qrngStatus.value.entropy_quality
+  if (q === 'excellent') return '优秀'
+  if (q === 'good') return '良好'
+  if (q === 'fair') return '一般'
+  return '较差'
+})
 
 // 格式化时间
 const formatTime = (isoString) => {
